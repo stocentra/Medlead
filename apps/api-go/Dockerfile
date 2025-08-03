@@ -6,15 +6,17 @@ FROM golang:1.21-alpine AS builder
 WORKDIR /app
 
 # --- THIS IS THE CORRECTED PART ---
-# Copy go.mod and go.sum files from their specific path in the monorepo
-# into the current working directory (/app)
-COPY apps/api-go/go.mod apps/api-go/go.sum ./
+# Copy only the go.mod file first.
+COPY apps/api-go/go.mod ./
+
+# Download dependencies. This will create a go.sum file inside the container
+# if any dependencies exist. It won't fail if there are none.
 RUN go mod download
 
-# Copy the source code of the api-go service into the container
+# Now, copy the rest of the source code for this service
 COPY apps/api-go/ ./
 
-# Build the application by pointing to the main package inside the cmd directory
+# Build the application
 RUN CGO_ENABLED=0 go build -o /server ./cmd
 
 # --- Final Stage ---
@@ -26,7 +28,7 @@ WORKDIR /
 # Copy the built binary from the builder stage
 COPY --from=builder /server /server
 
-# Expose the port the app runs on (Koyeb sets this to 8080)
+# Expose the port the app runs on
 EXPOSE 8080
 
 # Command to run the executable
