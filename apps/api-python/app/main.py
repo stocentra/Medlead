@@ -1,19 +1,17 @@
 from fastapi import FastAPI
-from .routes import chat # Import the chat router
+from app.routes import chat
 
-# Create the main FastAPI application instance
 app = FastAPI(
-    title="Medlead AI Core API",
-    description="The core AI service for the Medlead clinical assistant.",
+    title="MedLead AI Core Service",
+    description="This service handles the core AI logic, including prompt engineering and communication with Google Gemini.",
     version="1.0.0"
 )
 
-# Include the chat router in the main application
-app.include_router(chat.router)
+app.include_router(chat.router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health Check"])
-async def health_check():
+def health_check():
     """
     A simple health check endpoint to confirm the service is running.
     """
-    return {"status": "ok", "description": "AI service is up and running"}
+    return {"status": "ok", "description": "AI Core service is healthy"}
