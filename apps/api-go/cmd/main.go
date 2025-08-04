@@ -9,6 +9,17 @@ import (
 
 // handler is a simple HTTP handler that writes a welcome message.
 func handler(w http.ResponseWriter, r *http.Request) {
+	// CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*") // یا دامنه فرانت خود را جایگزین کنید
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// Handle preflight OPTIONS request
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	// Set the content type to plain text
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
