@@ -1,21 +1,21 @@
+import logging 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from supabase import create_client, Client, ClientOptions
 from pydantic import ValidationError
 import httpx
 import ssl
-import certifi # Import certifi
+import certifi
 
 from app.core.config import settings
 from app.models.schemas import UserProfile
 
+# Create a logger instance for this specific file.
+logger = logging.getLogger(__name__)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-# --- FINAL FIX FOR SSL ISSUE ---
 # Create a secure SSL context using certifi's certificate bundle.
-# This provides a reliable set of root certificates, bypassing potential
-# issues with the system's trust store on Windows.
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 # Create a custom httpx client with the secure SSL context and a longer timeout.
@@ -33,8 +33,6 @@ supabase_admin: Client = create_client(
     settings.SUPABASE_SERVICE_ROLE_KEY,
     options=supabase_options
 )
-# --- END OF FIX ---
-
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
     credentials_exception = HTTPException(
@@ -68,7 +66,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         user_profile = UserProfile(**profile_data)
 
     except Exception as e:
-        print(f"CRITICAL: Error during token validation or profile fetch: {e}")
+        # This will now reliably appear in the Koyeb logs.
+        logger.error(f"Failed to validate token or fetch profile. Root cause: {e}", exc_info=True)
         raise credentials_exception
     
     return user_profile

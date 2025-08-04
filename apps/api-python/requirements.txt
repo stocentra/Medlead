@@ -9,4 +9,4 @@ python-jose[cryptography]
 httpx
 certifi
 requests
-gunicorn # <-- این خط را اضافه کنید
+gunicorn 
