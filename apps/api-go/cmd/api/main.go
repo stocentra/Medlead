@@ -1,3 +1,4 @@
+// In: cmd/api/main.go
 package main
 
 import (
@@ -12,17 +13,20 @@ import (
 
 func main() {
 	// Load application configuration.
-	// The LoadConfig function does not return an error.
 	cfg := config.LoadConfig()
 
 	// Initialize a standard logger.
 	logger := log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 
-	// Initialize the Supabase client.
-	// The 'err' variable is declared here for the first time using ':='.
-	dbClient, err := supa.NewClient(cfg.SupabaseURL, cfg.SupabaseServiceKey, nil)
+	// --- THE FIX IS HERE ---
+	// Create client options and explicitly set the schema to "public".
+	clientOptions := supa.ClientOptions{
+		Schema: "public",
+	}
+
+	// Initialize the Supabase client with the correct options.
+	dbClient, err := supa.NewClient(cfg.SupabaseURL, cfg.SupabaseServiceKey, &clientOptions)
 	if err != nil {
-		// 'err' is visible here and we can check if it's not nil.
 		logger.Fatalf("FATAL: could not create supabase client: %v", err)
 	}
 	logger.Println("Successfully connected to Supabase.")
@@ -35,8 +39,6 @@ func main() {
 	}
 
 	// Start the server.
-	// Inside the 'if' statement, 'err' is re-declared for the scope of this 'if' block.
-	// This is a common and correct pattern in Go.
 	if err := app.Serve(); err != nil {
 		logger.Fatalf("FATAL: could not start server: %v", err)
 	}
