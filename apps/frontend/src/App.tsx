@@ -7,7 +7,7 @@ function App() {
 
   useEffect(() => {
     // Fetch the message from our Go backend
-    fetch('https://api.medlead.ir') //  <-- آدرس بک‌اند شما
+    fetch('https://api.medlead.ir/') //  <-- آدرس بک‌اند شما
       .then(response => {
         if (!response.ok) {
           throw new Error(`Network response was not ok: ${response.statusText}`);
