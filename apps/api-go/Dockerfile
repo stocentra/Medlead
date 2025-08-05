@@ -5,19 +5,20 @@ FROM golang:1.24-alpine AS builder
 # Set the working directory inside the container
 WORKDIR /app
 
-# --- THIS IS THE CORRECTED PART ---
-# Copy only the go.mod file first.
+# Copy the module files to leverage Docker layer caching
 COPY apps/api-go/go.mod ./
+COPY apps/api-go/go.sum ./
 
-# Download dependencies. This will create a go.sum file inside the container
-# if any dependencies exist. It won't fail if there are none.
+# Download dependencies
 RUN go mod download
 
-# Now, copy the rest of the source code for this service
+# Copy the rest of the source code for this service
 COPY apps/api-go/ ./
 
-# Build the application
-RUN CGO_ENABLED=0 go build -o /server ./cmd
+# --- THE FIX IS HERE ---
+# Build the application by explicitly pointing to the correct main package
+# located in the ./cmd/api/ directory.
+RUN CGO_ENABLED=0 go build -o /server ./cmd/api
 
 # --- Final Stage ---
 # Use a minimal, non-root image for the final container
