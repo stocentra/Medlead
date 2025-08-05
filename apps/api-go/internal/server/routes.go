@@ -12,8 +12,9 @@ func (app *App) routes() http.Handler {
 
 	// Initialize auth handlers with dependencies from the app struct
 	authHandlers := &auth.Handlers{
-		DB:  app.DB,
-		Log: app.Log,
+		DB:   app.DB,
+		Pool: app.Pool, // Add this line - pass the connection pool
+		Log:  app.Log,
 	}
 
 	// === PUBLIC AUTHENTICATION ROUTES ===
