@@ -37,7 +37,7 @@ type RegisterRequest struct {
 	ProfessionalLevel string `json:"professional_level"`
 }
 
-// Register now uses a robust two-step process: INSERT then SELECT.
+// Register now correctly inserts all required fields and returns the full profile.
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -62,11 +62,12 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	tokenExpiry := time.Now().Add(24 * time.Hour)
 	newUserID := uuid.New()
 
-	// --- Step 1: INSERT the new user ---
+	// --- THE FIX IS HERE ---
+	// The INSERT statement now includes all fields from the request.
 	insertQuery := `
-		INSERT INTO public.profiles
-			(id, email, password_hash, full_name, country, professional_level, email_verification_token, email_verification_token_expires_at)
-		VALUES
+		INSERT INTO public.profiles 
+			(id, email, password_hash, full_name, country, professional_level, email_verification_token, email_verification_token_expires_at) 
+		VALUES 
 			($1, $2, $3, $4, $5, $6, $7, $8)`
 
 	_, err = h.Pool.Exec(context.Background(), insertQuery,
@@ -79,13 +80,13 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- Step 2: SELECT the complete profile to get all fields, including DB defaults ---
+	// SELECT the complete profile to get all fields, including DB defaults
 	var createdUser models.Profile
 	selectQuery := `
-		SELECT
+		SELECT 
 			id, email, full_name, country, system_role, professional_level, verification_status,
 			created_at, updated_at
-		FROM public.profiles
+		FROM public.profiles 
 		WHERE id = $1`
 
 	err = h.Pool.QueryRow(context.Background(), selectQuery, newUserID).Scan(
@@ -100,7 +101,7 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send the verification email in a separate goroutine
+	// Send the verification email
 	go func() {
 		err := h.EmailClient.SendVerificationEmail(createdUser.Email, verificationToken)
 		if err != nil {

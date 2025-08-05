@@ -21,7 +21,7 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		ServerPort:   getEnv("SERVER_PORT", "8080"),
+		ServerPort:   getEnv("SERVER_PORT", "8000"),
 		DatabaseURL:  getEnv("DATABASE_URL", ""),
 		JWTSecret:    getEnv("JWT_SECRET", ""),
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""), // Load Resend API Key
