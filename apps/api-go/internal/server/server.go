@@ -5,16 +5,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool" // Import pgxpool
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stocentra/Medlead/api-go/internal/config"
-	supa "github.com/supabase-community/supabase-go"
 )
 
-// App holds application-wide dependencies
+// App holds application-wide dependencies.
 type App struct {
 	Config *config.Config
-	DB     *supa.Client  // Supabase client for Auth
-	Pool   *pgxpool.Pool // Connection pool for direct DB queries
+	Pool   *pgxpool.Pool // Connection pool for all database queries
 	Log    *log.Logger
 }
 

@@ -12,9 +12,9 @@ func (app *App) routes() http.Handler {
 
 	// Initialize auth handlers with dependencies from the app struct
 	authHandlers := &auth.Handlers{
-		DB:   app.DB,
-		Pool: app.Pool, // Add this line - pass the connection pool
-		Log:  app.Log,
+		Pool:      app.Pool,
+		Log:       app.Log,
+		JWTSecret: app.Config.JWTSecret, // Pass JWT secret to handlers
 	}
 
 	// === PUBLIC AUTHENTICATION ROUTES ===
@@ -22,7 +22,6 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("POST /v1/auth/login", authHandlers.Login)
 
 	// === PROTECTED ROUTES ===
-	// This route requires a valid JWT and is protected by the authMiddleware.
 	mux.Handle("GET /v1/users/me", app.authMiddleware(http.HandlerFunc(authHandlers.GetMe)))
 
 	// === HEALTH CHECK ROUTE ===

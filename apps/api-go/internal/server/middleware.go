@@ -1,5 +1,3 @@
-// In: internal/server/middleware.go
-
 package server
 
 import (
@@ -7,10 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/stocentra/Medlead/api-go/internal/auth"
 	"github.com/stocentra/Medlead/api-go/internal/models"
 )
 
-// authMiddleware protects routes requiring authentication.
+// authMiddleware protects routes requiring authentication by validating the JWT.
 func (app *App) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -25,23 +24,20 @@ func (app *App) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		token := parts[1]
+		tokenString := parts[1]
 
-		// Create a new client instance configured with the user's token.
-		authedClient := app.DB.Auth.WithToken(token)
-
-		// Get the user information using the token.
-		user, err := authedClient.GetUser()
+		// Validate the token using our JWT helper
+		userID, err := auth.ValidateToken(tokenString, app.Config.JWTSecret)
 		if err != nil {
-			app.Log.Printf("Error verifying token: %v", err)
-			http.Error(w, "Invalid authentication token", http.StatusUnauthorized)
+			app.Log.Printf("Invalid token: %v", err)
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
-		// Add the user object to the request context.
-		ctx := context.WithValue(r.Context(), models.UserContextKey, user)
+		// Add the user ID to the request context
+		ctx := context.WithValue(r.Context(), models.UserContextKey, userID)
 
-		// Serve the next handler with the new context.
+		// Serve the next handler with the new context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

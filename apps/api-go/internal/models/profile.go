@@ -8,9 +8,10 @@ import (
 )
 
 // Profile represents the structure of the 'profiles' table in the database.
-// It is a complete mirror of the database table to ensure correct JSON unmarshalling.
 type Profile struct {
 	ID                     uuid.UUID       `json:"id"`
+	Email                  string          `json:"email"`
+	PasswordHash           string          `json:"-"` // Never expose the password hash in JSON responses
 	FullName               *string         `json:"full_name,omitempty"`
 	NationalID             *string         `json:"national_id,omitempty"`
 	Gender                 *string         `json:"gender,omitempty"`
