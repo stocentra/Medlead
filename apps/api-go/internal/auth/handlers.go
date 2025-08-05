@@ -1,3 +1,4 @@
+// In: internal/auth/handlers.go
 package auth
 
 import (
@@ -36,7 +37,7 @@ type RegisterRequest struct {
 	ProfessionalLevel string `json:"professional_level"`
 }
 
-// Register handles new user registration, creates a verification token, and sends a verification email.
+// Register now uses a robust two-step process: INSERT then SELECT.
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -51,7 +52,6 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a secure, random verification token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		h.Log.Println("Error generating verification token:", err)
@@ -60,16 +60,17 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	verificationToken := hex.EncodeToString(tokenBytes)
 	tokenExpiry := time.Now().Add(24 * time.Hour)
+	newUserID := uuid.New()
 
-	// Insert the new user along with the verification token
-	query := `
-		INSERT INTO public.profiles 
-			(id, email, password_hash, full_name, country, professional_level, email_verification_token, email_verification_token_expires_at) 
-		VALUES 
+	// --- Step 1: INSERT the new user ---
+	insertQuery := `
+		INSERT INTO public.profiles
+			(id, email, password_hash, full_name, country, professional_level, email_verification_token, email_verification_token_expires_at)
+		VALUES
 			($1, $2, $3, $4, $5, $6, $7, $8)`
 
-	_, err = h.Pool.Exec(context.Background(), query,
-		uuid.New(), req.Email, string(hashedPassword), req.FullName, req.Country, req.ProfessionalLevel, verificationToken, tokenExpiry,
+	_, err = h.Pool.Exec(context.Background(), insertQuery,
+		newUserID, req.Email, string(hashedPassword), req.FullName, req.Country, req.ProfessionalLevel, verificationToken, tokenExpiry,
 	)
 
 	if err != nil {
@@ -78,19 +79,38 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send the verification email in a separate goroutine to not block the HTTP response
+	// --- Step 2: SELECT the complete profile to get all fields, including DB defaults ---
+	var createdUser models.Profile
+	selectQuery := `
+		SELECT
+			id, email, full_name, country, system_role, professional_level, verification_status,
+			created_at, updated_at
+		FROM public.profiles
+		WHERE id = $1`
+
+	err = h.Pool.QueryRow(context.Background(), selectQuery, newUserID).Scan(
+		&createdUser.ID, &createdUser.Email, &createdUser.FullName, &createdUser.Country,
+		&createdUser.SystemRole, &createdUser.ProfessionalLevel, &createdUser.VerificationStatus,
+		&createdUser.CreatedAt, &createdUser.UpdatedAt,
+	)
+
+	if err != nil {
+		h.Log.Printf("Error fetching newly created user %s: %v", newUserID, err)
+		http.Error(w, "Failed to retrieve user profile after creation", http.StatusInternalServerError)
+		return
+	}
+
+	// Send the verification email in a separate goroutine
 	go func() {
-		err := h.EmailClient.SendVerificationEmail(req.Email, verificationToken)
+		err := h.EmailClient.SendVerificationEmail(createdUser.Email, verificationToken)
 		if err != nil {
-			h.Log.Printf("Failed to send verification email to %s: %v", req.Email, err)
+			h.Log.Printf("Failed to send verification email to %s: %v", createdUser.Email, err)
 		}
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Registration successful. Please check your email to verify your account.",
-	})
+	json.NewEncoder(w).Encode(createdUser)
 }
 
 // VerifyEmail handles the email verification link click.
@@ -104,12 +124,12 @@ func (h *Handlers) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	// Find the user with the given token, update their status, and clear the token details
 	query := `
 		UPDATE public.profiles
-		SET 
-			verification_status = 'verified', 
-			email_verification_token = NULL, 
+		SET
+			verification_status = 'verified',
+			email_verification_token = NULL,
 			email_verification_token_expires_at = NULL,
 			updated_at = NOW()
-		WHERE 
+		WHERE
 			email_verification_token = $1 AND email_verification_token_expires_at > NOW()
 		RETURNING id`
 
@@ -155,8 +175,8 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 
 	var user models.Profile
 	query := `
-		SELECT 
-			id, email, password_hash, full_name, country, professional_level, 
+		SELECT
+			id, email, password_hash, full_name, country, professional_level,
 			system_role, verification_status, created_at, updated_at
 		FROM public.profiles WHERE email = $1`
 
@@ -215,12 +235,12 @@ func (h *Handlers) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	var profile models.Profile
 	query := `
-		SELECT 
+		SELECT
 			id, email, full_name, country, system_role, professional_level, verification_status,
-			national_id, gender, phone_number, university, student_id, 
-			medical_license_number, specialty_id, country_specific_details, 
-			created_at, updated_at 
-		FROM public.profiles 
+			national_id, gender, phone_number, university, student_id,
+			medical_license_number, specialty_id, country_specific_details,
+			created_at, updated_at
+		FROM public.profiles
 		WHERE id = $1`
 
 	err := h.Pool.QueryRow(context.Background(), query, userID).Scan(
