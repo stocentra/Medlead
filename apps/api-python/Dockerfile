@@ -1,38 +1,36 @@
 # Stage 1: Builder
 FROM python:3.12-bookworm as builder
 
-# Set working directory inside the container
+# --- THE FIX IS HERE ---
+# Set reliable public DNS servers for the build stage to ensure dependencies can be downloaded.
+# This prevents failures caused by the host's default DNS resolver.
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
 WORKDIR /app
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# --- THE FIX IS HERE ---
-# Copy the requirements file using its full path from the repository root.
 COPY apps/api-python/requirements.txt .
 
-# Install dependencies into a wheelhouse
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 
 # Stage 2: Final Image
 FROM python:3.12-slim
 
+# --- THE FIX IS HERE ---
+# Apply the same reliable DNS configuration to the final running container.
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
 WORKDIR /app
 
-# Copy the pre-built wheels from the builder stage
 COPY --from=builder /app/wheels /app/wheels
-
-# --- THE FIX IS HERE ---
-# Copy the application source code using its full path from the repository root.
 COPY apps/api-python/app ./app
-
-# Install the dependencies from the local wheelhouse
 RUN pip install --no-index --find-links=/app/wheels /app/wheels/*
 
-# Expose the port the app will run on
 EXPOSE 8000
 
-# The command to run the application using Gunicorn
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]
