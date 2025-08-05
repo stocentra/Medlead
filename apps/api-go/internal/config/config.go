@@ -24,7 +24,7 @@ func LoadConfig() *Config {
 	return &Config{
 		SupabaseURL:        getEnv("SUPABASE_URL", ""),
 		SupabaseServiceKey: getEnv("SUPABASE_SERVICE_KEY", ""),
-		ServerPort:         getEnv("SERVER_PORT", "8080"),
+		ServerPort:         getEnv("SERVER_PORT", "8000"),
 	}
 }
 
