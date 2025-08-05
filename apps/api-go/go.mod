@@ -20,4 +20,5 @@ require (
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
+	github.com/resend/resend-go/v2 v2.21.0
 )
