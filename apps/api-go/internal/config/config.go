@@ -12,6 +12,7 @@ type Config struct {
 	SupabaseURL        string
 	SupabaseServiceKey string
 	ServerPort         string
+	DatabaseURL        string // For the pgx connection pooler
 }
 
 // LoadConfig loads application configuration from environment variables
@@ -25,6 +26,7 @@ func LoadConfig() *Config {
 		SupabaseURL:        getEnv("SUPABASE_URL", ""),
 		SupabaseServiceKey: getEnv("SUPABASE_SERVICE_KEY", ""),
 		ServerPort:         getEnv("SERVER_PORT", "8000"),
+		DatabaseURL:        getEnv("DATABASE_URL", ""), // Load the pooler connection string
 	}
 }
 

@@ -2,10 +2,12 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgxpool" // Import pgxpool
 	"github.com/stocentra/Medlead/api-go/internal/models"
 	"github.com/supabase-community/gotrue-go/types"
 	supa "github.com/supabase-community/supabase-go"
@@ -13,8 +15,9 @@ import (
 
 // Handlers holds dependencies for auth handlers.
 type Handlers struct {
-	DB  *supa.Client
-	Log *log.Logger
+	DB   *supa.Client  // For Auth operations (login, register)
+	Pool *pgxpool.Pool // For direct database queries (fetching profiles)
+	Log  *log.Logger
 }
 
 // credentials is a struct for decoding login requests.
@@ -62,37 +65,39 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 // GetMe retrieves the full professional profile of the authenticated user.
 func (h *Handlers) GetMe(w http.ResponseWriter, r *http.Request) {
 	// Step 1: Get the authenticated user from the context.
+	// This part is handled by the middleware and doesn't change.
 	authUser, ok := r.Context().Value(models.UserContextKey).(*types.UserResponse)
 	if !ok || authUser == nil {
-		h.Log.Println("Could not retrieve authenticated user from context")
 		http.Error(w, "Could not retrieve user from context", http.StatusInternalServerError)
 		return
 	}
 
-	// Step 2: Fetch the user's profile from the 'profiles' table.
-	// The .Single() method returns a single JSON object, not an array.
-	data, _, err := h.DB.From("profiles").
-		Select("*", "exact", false).
-		Eq("id", authUser.ID.String()).
-		Single().
-		Execute()
+	// Step 2: Fetch the user's profile from the 'profiles' table using pgx.
+	var profile models.Profile
+	query := `
+		SELECT 
+			id, full_name, national_id, gender, country, phone_number, 
+			system_role, professional_level, university, student_id, 
+			medical_license_number, specialty_id, verification_status, 
+			country_specific_details, created_at, updated_at 
+		FROM public.profiles 
+		WHERE id = $1`
+
+	err := h.Pool.QueryRow(context.Background(), query, authUser.ID).Scan(
+		&profile.ID, &profile.FullName, &profile.NationalID, &profile.Gender,
+		&profile.Country, &profile.PhoneNumber, &profile.SystemRole,
+		&profile.ProfessionalLevel, &profile.University, &profile.StudentID,
+		&profile.MedicalLicenseNumber, &profile.SpecialtyID, &profile.VerificationStatus,
+		&profile.CountrySpecificDetails, &profile.CreatedAt, &profile.UpdatedAt,
+	)
 
 	if err != nil {
-		h.Log.Printf("Error fetching profile for user %s: %v", authUser.ID, err)
+		h.Log.Printf("Error fetching profile for user %s from pooler: %v", authUser.ID, err)
 		http.Error(w, "Failed to fetch user profile", http.StatusInternalServerError)
 		return
 	}
 
-	// --- THE FIX IS HERE ---
-	// Step 3: Unmarshal the raw data into a single Profile struct, not a slice.
-	var profile models.Profile
-	if err := json.Unmarshal(data, &profile); err != nil {
-		h.Log.Printf("Error unmarshalling profile data: %v", err)
-		http.Error(w, "Failed to process user profile data", http.StatusInternalServerError)
-		return
-	}
-
-	// Step 4: Return the complete profile as the response.
+	// Step 3: Return the complete profile as the response.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(profile)
