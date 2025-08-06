@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.security import get_current_user
 from app.schemas import ChatRequest, ChatResponse, UserProfile
 from app.core.prompt_engine import create_prompt
-from app.core.ai_engine import generate_text_with_google_search
+from app.core.ai_engine import generate_text_with_google_search, should_use_search
 
 logger = logging.getLogger(__name__)
 
