@@ -9,15 +9,15 @@ logger = logging.getLogger(__name__)
 
 def generate_text_with_google_search(prompt: str, user_profile: UserProfile) -> str:
     """
-    Generates a response from the Gemini API using the specified prompt,
-    with Google Search grounding enabled. This is the core AI function.
+    Generates a response from the Gemini API using the specified prompt.
+    Google Search temporarily disabled for debugging timeout issues.
     """
     try:
         api_key = key_manager.get_next_key()
         client = genai.Client(api_key=api_key)
 
-        # Define the Google Search tool with correct syntax
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
+        # Temporarily comment out Google Search tool to debug timeout
+        # grounding_tool = types.Tool(google_search=types.GoogleSearch())
 
         safety_settings = [
             types.SafetySetting(
@@ -40,14 +40,17 @@ def generate_text_with_google_search(prompt: str, user_profile: UserProfile) -> 
         
         config = types.GenerateContentConfig(
             temperature=1.0,
-            tools=[grounding_tool],
+            # tools=[grounding_tool],  # Commented out temporarily
             safety_settings=safety_settings,
             system_instruction=prompt
         )
 
+        # Log the actual user query for debugging
+        logger.info(f"Sending query to Gemini for user {user_profile.id}")
+        
         response = client.models.generate_content(
             model="gemini-2.5-pro",
-            contents="",
+            contents=f"User query: {prompt}",
             config=config
         )
         

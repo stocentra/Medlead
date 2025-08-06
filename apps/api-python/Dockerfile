@@ -31,4 +31,4 @@ COPY apps/api-python/ .
 EXPOSE 8000
 
 # Now gunicorn can find app.main:app correctly
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "2", "-b", "0.0.0.0:8000", "--timeout", "120", "--keep-alive", "5", "app.main:app"]
