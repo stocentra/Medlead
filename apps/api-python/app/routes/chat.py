@@ -28,7 +28,15 @@ async def handle_chat(
     try:
         final_prompt = create_prompt(user_profile=current_user, user_query=request.query)
         
-        ai_response_text = generate_text_with_google_search(prompt=final_prompt, user_profile=current_user)
+        # Intelligent search decision
+        use_search = should_use_search(request.query)
+        logger.info(f"Query from {current_user.id}: search_needed={use_search}")
+        
+        ai_response_text = generate_text_with_google_search(
+            prompt=final_prompt, 
+            user_profile=current_user, 
+            use_search=use_search
+        )
 
         logger.info(f"Successfully processed chat request for user {current_user.id}")
         return ChatResponse(response=ai_response_text)
