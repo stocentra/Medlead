@@ -5,42 +5,43 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.models.schemas import UserProfile
+from app.schemas import UserProfile
 
+# Initialize a logger for this module
 logger = logging.getLogger(__name__)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# This tells FastAPI's documentation UI how to handle authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") # "token" is a placeholder
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
     """
-    Gets the current user's profile by making a service-to-service call
-    to the public Go API endpoint (/v1/users/me).
+    Validates the JWT token by making a service-to-service call to the Go API.
+    If the token is valid, it returns the full user profile.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
     )
     
-    # Construct the full public URL to the Go service's protected endpoint.
     go_api_url = f"{settings.GO_API_URL}/v1/users/me"
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+    headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        # Make a request to the public Go service domain.
-        response = requests.get(go_api_url, headers=headers, timeout=15)
+        # Make a request to the go-api service to validate the token and get the profile
+        response = requests.get(go_api_url, headers=headers, timeout=10)
         
+        # If the Go service returns a 401, the token is invalid
         if response.status_code == 401:
-            logger.warning(f"Token validation failed by the Go API. URL: {go_api_url}")
+            logger.warning("Token validation failed by the Go API.")
             raise credentials_exception
         
+        # Raise an exception for other HTTP errors (like 500 from the Go service)
         response.raise_for_status()
         
         profile_data = response.json()
         
-        if "specialty_name" not in profile_data:
-             profile_data['specialty_name'] = "Not Specified"
-
+        # Use Pydantic to parse the JSON data into our UserProfile model
         user_profile = UserProfile(**profile_data)
         return user_profile
 
@@ -52,5 +53,5 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         logger.error(f"Failed to parse profile from Go API. Error: {e}. Data: {profile_text}")
         raise HTTPException(status_code=500, detail="Invalid profile data received from user service.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred during user validation. Error: {e}", exc_info=True)
+        logger.error(f"An unexpected error occurred during user validation: {e}", exc_info=True)
         raise credentials_exception
