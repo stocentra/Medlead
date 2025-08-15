@@ -1,3 +1,4 @@
+// In: internal/auth/jwt.go
 package auth
 
 import (
@@ -14,24 +15,37 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// GenerateToken creates a new JWT access token for a given user ID.
-func GenerateToken(userID uuid.UUID, secretKey string) (string, error) {
+// GenerateAccessToken creates a new short-lived JWT access token.
+func GenerateAccessToken(userID uuid.UUID, secretKey string) (string, error) {
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)), // Token is valid for 24 hours
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Short-lived (e.g., 15 minutes)
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "medlead-api",
 		},
 	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secretKey))
+}
 
+// GenerateRefreshToken creates a new long-lived JWT refresh token.
+func GenerateRefreshToken(userID uuid.UUID, secretKey string) (string, error) {
+	claims := &Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), // Long-lived (e.g., 7 days)
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "medlead-api-refresh",
+		},
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secretKey))
 }
 
 // ValidateToken parses and validates a JWT token string.
-// It returns the user ID from the token if it's valid.
 func ValidateToken(tokenString string, secretKey string) (uuid.UUID, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

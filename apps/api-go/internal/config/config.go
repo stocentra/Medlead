@@ -1,3 +1,4 @@
+// In: internal/config/config.go
 package config
 
 import (
@@ -8,11 +9,15 @@ import (
 )
 
 type Config struct {
-	ServerPort   string
-	DatabaseURL  string
-	JWTSecret    string
-	ResendAPIKey string // API Key for Resend
-	EmailFrom    string // The "from" email address for sending emails
+	ServerPort        string
+	DatabaseURL       string
+	JWTSecret         string
+	ResendAPIKey      string
+	EmailFrom         string
+	R2Endpoint        string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2BucketName      string
 }
 
 func LoadConfig() *Config {
@@ -21,11 +26,15 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		ServerPort:   getEnv("SERVER_PORT", "8000"),
-		DatabaseURL:  getEnv("DATABASE_URL", ""),
-		JWTSecret:    getEnv("JWT_SECRET", ""),
-		ResendAPIKey: getEnv("RESEND_API_KEY", ""), // Load Resend API Key
-		EmailFrom:    getEnv("EMAIL_FROM", ""),     // Load the sender email
+		ServerPort:        getEnv("SERVER_PORT", "8080"),
+		DatabaseURL:       getEnv("DATABASE_URL", ""),
+		JWTSecret:         getEnv("JWT_SECRET", ""),
+		ResendAPIKey:      getEnv("RESEND_API_KEY", ""),
+		EmailFrom:         getEnv("EMAIL_FROM", ""),
+		R2Endpoint:        getEnv("R2_ENDPOINT", ""),
+		R2AccessKeyID:     getEnv("R2_ACCESS_KEY_ID", ""),
+		R2SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY", ""),
+		R2BucketName:      getEnv("R2_BUCKET_NAME", ""),
 	}
 }
 

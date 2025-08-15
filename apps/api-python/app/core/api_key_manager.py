@@ -1,32 +1,44 @@
-import itertools
+import threading
 import logging
+from typing import List
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-class ApiKeyManager:
+class ThreadSafeApiKeyManager:
     """
-    A simple thread-safe manager to cycle through a list of API keys.
+    Thread-safe API key manager with round-robin distribution.
+    Optimized for high concurrency (1000+ simultaneous users).
     """
-    def __init__(self, api_keys: list[str]):
+    def __init__(self, api_keys: List[str]):
         if not api_keys:
-            logger.critical("CRITICAL: No Gemini API keys were found in the configuration. The service will not be able to process AI requests.")
-            # We don't raise an error here to allow the app to start,
-            # but it will fail on the first request.
-            self.api_keys = itertools.cycle([])
+            logger.critical("CRITICAL: No Gemini API keys found. Service will fail on first request.")
+            self.api_keys = []
+            self._current_index = 0
         else:
-            self.api_keys = itertools.cycle(api_keys)
-            logger.info(f"Loaded {len(api_keys)} Gemini API key(s).")
+            self.api_keys = api_keys
+            self._current_index = 0
+            logger.info(f"Loaded {len(api_keys)} Gemini API key(s) with thread-safe rotation.")
+        
+        # Thread-safe lock for key rotation
+        self._lock = threading.Lock()
 
     def get_next_key(self) -> str:
         """
-        Returns the next available API key in a round-robin fashion.
+        Returns the next API key in a thread-safe round-robin fashion.
+        Optimized for minimal lock contention.
         """
-        try:
-            return next(self.api_keys)
-        except StopIteration:
-            # This happens if the initial list was empty.
+        if not self.api_keys:
             raise ValueError("No API keys available to use.")
+        
+        with self._lock:
+            key = self.api_keys[self._current_index]
+            self._current_index = (self._current_index + 1) % len(self.api_keys)
+            return key
 
-# Create a single, importable instance of the key manager
-key_manager = ApiKeyManager(settings.GEMINI_API_KEYS)
+    def get_key_count(self) -> int:
+        """Returns the number of available API keys."""
+        return len(self.api_keys)
+
+# Create singleton instance
+key_manager = ThreadSafeApiKeyManager(settings.GEMINI_API_KEYS)

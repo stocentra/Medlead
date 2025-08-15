@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    // For project references
+    "composite": true,
+
+    // Replaces "noEmit" to solve the conflict with "allowImportingTsExtensions"
+    "emitDeclarationOnly": true,
+    
+    // Allows importing '.ts' files in other '.ts' files
+    "allowImportingTsExtensions": true,
+
+    // Base options
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    
+    // Linting
+    "strict": true
+  },
+  "include": ["vite.config.ts"]
+}

@@ -1,31 +1,43 @@
 import os
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
-# .env file is loaded automatically by pydantic_settings
-
-class Settings(BaseSettings):
+class OptimizedSettings(BaseSettings):
     """
-    Loads all configuration from environment variables.
-    Pydantic performs automatic validation for these settings.
+    Optimized configuration for high-concurrency deployment.
+    Includes performance tuning parameters.
     """
-    # --- Service Connectivity ---
-    GO_API_URL: str # The public URL for the Go service (e.g., https://api.medlead.ir)
-
-    # --- Gemini API Configuration ---
-    GEMINI_API_KEYS: List[str] = [] # Will be populated from GEMINI_API_KEY_n variables
-
-    # --- Prompt Engineering Configuration ---
+    # Original settings
+    GO_API_URL: str
+    GEMINI_API_KEYS: List[str] = []
     MODEL_PERSONA: str
     SYSTEM_PREAMBLE: str
+
+    # R2 Configuration
+    R2_ENDPOINT_URL: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_TRAINING_BUCKET_NAME: Optional[str] = None
+    
+    # Performance optimization settings
+    DEBUG: bool = False
+    MAX_CONCURRENT_REQUESTS: int = 500
+    CONNECTION_POOL_SIZE: int = 200
+    CONNECTION_TIMEOUT: float = 5.0
+    READ_TIMEOUT: float = 10.0
+    
+    # Rate limiting
+    REQUESTS_PER_MINUTE: int = 1000
+    BURST_LIMIT: int = 100
     
     class Config:
         env_file = ".env"
-        case_sensitive = True # Ensures variable names match exactly
+        case_sensitive = True
 
     def __init__(self, **values):
         super().__init__(**values)
-        # Custom logic to load multiple Gemini API keys
+        
+        # Load API keys dynamically (your original logic)
         i = 1
         while True:
             key = os.getenv(f"GEMINI_API_KEY_{i}")
@@ -36,8 +48,19 @@ class Settings(BaseSettings):
                 break
         
         if not self.GEMINI_API_KEYS:
-            # This check is important for production stability
-            print("WARNING: No GEMINI_API_KEY_n variables found in the environment. AI service will fail.")
+            print("WARNING: No GEMINI_API_KEY_n variables found.")
+        
+        # Set debug mode
+        self.DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+        
+        # Performance tuning based on environment
+        if os.getenv("ENVIRONMENT") == "production":
+            self.MAX_CONCURRENT_REQUESTS = 1000
+            self.CONNECTION_POOL_SIZE = 500
+            self.REQUESTS_PER_MINUTE = 2000
+        
+        print(f"Configuration loaded: {len(self.GEMINI_API_KEYS)} API keys, "
+              f"max_concurrent: {self.MAX_CONCURRENT_REQUESTS}, "
+              f"debug: {self.DEBUG}")
 
-# Create a single, importable instance of the settings
-settings = Settings()
+settings = OptimizedSettings()
