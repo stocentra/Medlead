@@ -33,6 +33,7 @@ class OptimizedSettings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"  # Allow extra fields from environment variables
 
     def __init__(self, **values):
         super().__init__(**values)
