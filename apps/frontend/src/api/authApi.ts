@@ -1,14 +1,16 @@
+// frontend/src/api/authApi.ts
+
 import apiClient from './index'
 import { 
   AuthResponse, 
   LoginRequest, 
-  RegisterRequest, 
   User, 
   UpdateUserPayload, 
   ChangePasswordPayload, 
   Notification,
   VerifyDiscountRequest,
-  VerifyDiscountResponse
+  VerifyDiscountResponse,
+  RegisterRequestWithDocument // Only this one is needed now
 } from '@/types'
 
 /**
@@ -31,10 +33,32 @@ export const loginUser = async (
  * @param data - The new user's registration details.
  * @returns A promise that resolves to the newly created user's profile.
  */
-export const registerUser = async (data: RegisterRequest): Promise<User> => {
-  const response = await apiClient.post<User>('/auth/register', data)
-  return response.data
+// --- MODIFIED FUNCTION ---
+export const registerUser = async (data: RegisterRequestWithDocument): Promise<User> => {
+  const formData = new FormData();
+
+  // Append all the text fields
+  formData.append('full_name', data.full_name);
+  formData.append('email', data.email);
+  formData.append('password', data.password);
+  formData.append('country', data.country);
+  formData.append('professional_level', data.professional_level);
+  
+  // Append the file if it exists
+  if (data.document) {
+    formData.append('document', data.document);
+  }
+
+  // Send as multipart/form-data
+  const response = await apiClient.post<User>('/auth/register', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
 }
+// --- END OF MODIFIED FUNCTION ---
 
 /**
  * Fetches the full profile of the currently authenticated user.

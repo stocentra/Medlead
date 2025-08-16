@@ -1,3 +1,5 @@
+// apps/api-go/internal/auth/handlers.go
+
 package auth
 
 import (
@@ -73,14 +75,32 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
-// Register now handles both required and optional fields.
+// --- MODIFIED FUNCTION ---
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	// 1. Parse multipart form data (max 10MB)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Error parsing form data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// 2. Extract user data from form fields
+	req := RegisterRequest{
+		Email:             r.FormValue("email"),
+		Password:          r.FormValue("password"),
+		FullName:          r.FormValue("full_name"),
+		Country:           r.FormValue("country"),
+		ProfessionalLevel: r.FormValue("professional_level"),
+	}
+
+	// Handle optional fields
+	if phone := r.FormValue("phone_number"); phone != "" {
+		req.PhoneNumber = &phone
+	}
+	if city := r.FormValue("city"); city != "" {
+		req.City = &city
+	}
+
+	// 3. Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		h.Log.Println("Error hashing password:", err)
@@ -88,6 +108,7 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 4. Generate verification token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		h.Log.Println("Error generating verification token:", err)
@@ -104,22 +125,77 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		countryDetails, _ = json.Marshal(cityMap)
 	}
 
+	// 5. Begin a database transaction
+	tx, err := h.Pool.Begin(context.Background())
+	if err != nil {
+		h.Log.Printf("Error starting transaction for new user: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(context.Background())
+
+	// 6. Insert the new user profile
 	insertQuery := `
 		INSERT INTO public.profiles 
 			(id, email, password_hash, full_name, country, professional_level, email_verification_token, email_verification_token_expires_at, phone_number, country_specific_details) 
 		VALUES 
 			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-
-	_, err = h.Pool.Exec(context.Background(), insertQuery,
+	_, err = tx.Exec(context.Background(), insertQuery,
 		newUserID, req.Email, string(hashedPassword), req.FullName, req.Country, req.ProfessionalLevel, verificationToken, tokenExpiry, req.PhoneNumber, countryDetails,
 	)
-
 	if err != nil {
 		h.Log.Println("Error inserting new user:", err)
 		http.Error(w, "Failed to create user (e.g., email already exists)", http.StatusInternalServerError)
 		return
 	}
 
+	// 7. Handle the document upload
+	file, handler, err := r.FormFile("document")
+	if err == nil {
+		defer file.Close()
+		ext := filepath.Ext(handler.Filename)
+
+		// Optional: Add file type validation if needed
+		// if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".pdf" { ... }
+
+		objectKey := fmt.Sprintf("verification-docs/%s/%s%s", newUserID.String(), uuid.New().String(), ext)
+
+		uploader := r.Context().Value("uploader").(*storage.R2Uploader)
+		uploadErr := uploader.UploadFile(r.Context(), newUserID, file, objectKey)
+		if uploadErr != nil {
+			h.Log.Printf("Error uploading file for user %s during registration: %v", newUserID, uploadErr)
+			// Decide if this should be a fatal error. For now, we continue but don't set status to pending.
+		} else {
+			// If upload is successful, record it and update profile status
+			insertDocQuery := `
+				INSERT INTO public.user_verification_documents (user_id, storage_path)
+				VALUES ($1, $2)`
+			_, err = tx.Exec(context.Background(), insertDocQuery, newUserID, objectKey)
+			if err != nil {
+				h.Log.Printf("Error inserting document record for user %s: %v", newUserID, err)
+			}
+
+			updateProfileQuery := `
+				UPDATE public.profiles
+				SET verification_status = 'pending', updated_at = NOW()
+				WHERE id = $1`
+			_, err = tx.Exec(context.Background(), updateProfileQuery, newUserID)
+			if err != nil {
+				h.Log.Printf("Error updating profile status for user %s: %v", newUserID, err)
+			}
+		}
+	} else if err != http.ErrMissingFile {
+		h.Log.Printf("Error processing uploaded file for new user: %v", err)
+	}
+
+	// 8. Commit the transaction
+	if err := tx.Commit(context.Background()); err != nil {
+		h.Log.Printf("Error committing transaction for new user %s: %v", newUserID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// 9. Fetch the final created user profile to return to the client
 	var createdUser models.Profile
 	selectQuery := `
 		SELECT 
@@ -134,10 +210,13 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		h.Log.Printf("Error fetching newly created user %s: %v", newUserID, err)
-		http.Error(w, "Failed to retrieve user profile after creation", http.StatusInternalServerError)
+		// User is created, but we can't return the profile. We can still return 201 Created.
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully, but could not retrieve profile."})
 		return
 	}
 
+	// 10. Send verification email in the background
 	go func() {
 		err := h.EmailClient.SendVerificationEmail(createdUser.Email, verificationToken)
 		if err != nil {
@@ -149,6 +228,8 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(createdUser)
 }
+
+// --- END OF MODIFIED FUNCTION ---
 
 // VerifyEmail handles the email verification link click.
 // --- CRITICAL FIX APPLIED HERE ---

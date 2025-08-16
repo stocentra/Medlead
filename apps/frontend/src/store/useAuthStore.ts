@@ -1,6 +1,8 @@
+// frontend/src/store/useAuthStore.ts
+
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { User, LoginRequest, RegisterRequest } from '@/types'
+import { User, LoginRequest, RegisterRequestWithDocument } from '@/types' // +++ Updated type import
 import { loginUser, registerUser, refreshAccessToken } from '@/api/authApi'
 
 interface AuthState {
@@ -10,7 +12,7 @@ interface AuthState {
   status: 'idle' | 'loading' | 'success' | 'error'
   message: string | null
   login: (credentials: LoginRequest) => Promise<void>
-  register: (data: RegisterRequest) => Promise<void>
+  register: (data: RegisterRequestWithDocument) => Promise<void> // +++ Updated type here
   logout: () => void
   clearStatus: () => void
   refreshAuthToken: () => Promise<void>
@@ -44,7 +46,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (data: RegisterRequest) => {
+      register: async (data: RegisterRequestWithDocument) => { // +++ Updated type here
         set({ status: 'loading', message: null })
         try {
           const registeredUser = await registerUser(data)

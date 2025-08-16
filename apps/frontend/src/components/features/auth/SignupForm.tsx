@@ -1,3 +1,5 @@
+// frontend/src/components/features/auth/SignupForm.tsx
+
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -80,18 +82,26 @@ const SignupForm = ({ onToggleView }: SignupFormProps) => {
 
   const isLoading = status === 'loading'
 
+  // --- MODIFIED FUNCTION ---
   const onSubmit: SubmitHandler<SignupFormInputs> = async (data) => {
+    // Extract the file from the FileList
+    const documentFile = data.document && data.document.length > 0 ? data.document[0] : undefined;
+
+    // The rest of your logic for phone number, etc. can remain here
     const fullPhoneNumber = data.phoneNumber ? `${callingCode}${data.phoneNumber}` : undefined;
     console.log("Full form data captured:", { ...data, phoneNumber: fullPhoneNumber, country_specific_details: { city: data.city } });
 
+    // Call registerUser with all data, including the document file
     await registerUser({
       full_name: data.fullName,
       email: data.email,
       password: data.password,
       country: data.country,
       professional_level: data.professionalLevel,
+      document: documentFile, // +++ Pass the file to the store action
     })
   }
+  // --- END OF MODIFIED FUNCTION ---
 
   const handleBackToLogin = () => {
     useAuthStore.getState().clearStatus()
