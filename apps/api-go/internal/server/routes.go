@@ -35,8 +35,9 @@ func (app *App) routes() http.Handler {
 	}
 
 	adminHandlers := &admin.Handlers{
-		Pool: app.Pool,
-		Log:  app.Log,
+		Pool:      app.Pool,
+		Log:       app.Log,
+		JWTSecret: app.Config.JWTSecret,
 	}
 
 	// --- Root Handler for the HTML page ---

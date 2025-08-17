@@ -21,8 +21,9 @@ import (
 
 // Handlers holds dependencies for admin handlers.
 type Handlers struct {
-	Pool *pgxpool.Pool
-	Log  *log.Logger
+	Pool      *pgxpool.Pool
+	Log       *log.Logger
+	JWTSecret string
 }
 
 // UserListResponse defines the structure for the user list endpoint.
