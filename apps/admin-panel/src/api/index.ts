@@ -1,39 +1,46 @@
-import axios from 'axios';
-import { useAuthStore } from '@/store/useAuthStore';
+// admin-panel/src/api/index.ts
 
-const getApiBaseUrl = () => {
-    // Vite provides these environment variables automatically.
-    // import.meta.env.PROD is true when running the 'build' command.
-    if (import.meta.env.PROD) {
-        const prodUrl = import.meta.env.VITE_API_BASE_URL;
-        if (!prodUrl) {
-            console.error("FATAL ERROR: VITE_API_BASE_URL is not defined in the production environment.");
-        }
-        return prodUrl;
-    }
-    // In development, you can set a default for convenience.
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/v1';
-};
+import axios from 'axios'
+import { useAuthStore } from '@/store/useAuthStore'
+
+const API_URL = (import.meta.env.VITE_API_BASE_URL || 'https://api.medlead.ir') + '/v1';
 
 const apiClient = axios.create({
-    baseURL: getApiBaseUrl(),
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
 
-// Interceptor to automatically add the authentication token to every request.
+// Request interceptor to add the auth token to every request
 apiClient.interceptors.request.use(
-    (config) => {
-        const token = useAuthStore.getState().token;
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
+  (config) => {
+    const { token } = useAuthStore.getState()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
     }
-);
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
 
-export default apiClient;
+// Response interceptor for handling 401 errors
+apiClient.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  async (error) => {
+    const originalRequest = error.config
+    if (error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+      // For now, if token is invalid, log the user out.
+      // A full token refresh logic can be implemented here in the future.
+      useAuthStore.getState().logout()
+    }
+    return Promise.reject(error)
+  }
+)
+
+export default apiClient
