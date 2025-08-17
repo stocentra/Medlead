@@ -3,7 +3,7 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/useAuthStore'
 
-const API_URL = (import.meta.env.VITE_API_BASE_URL || 'https://api.medlead.ir') + '/v1';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.medlead.ir/v1' ;
 
 const apiClient = axios.create({
   baseURL: API_URL,
