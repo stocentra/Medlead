@@ -1,22 +1,18 @@
-# This file defines custom HTTP headers for all pages served by Cloudflare Pages.
-
 /*
-  Content-Security-Policy:
-  - default-src 'self': By default, only allow content from our own domain.
-  - connect-src 'self' api.medlead.ir model.medlead.ir security.medlead.ir: Allow API calls to our own domain and our backend services.
-  - script-src 'self': Only allow JavaScript files from our own domain. This is a key defense against XSS.
-  - style-src 'self' 'unsafe-inline': Allow CSS files from our own domain. 'unsafe-inline' is often needed for utility-first CSS frameworks like Tailwind.
-  - img-src 'self' data:: Allows images from our own domain and from data URIs.
-  - font-src 'self': Allows fonts to be loaded from our own domain.
-  - object-src 'none': Disables plugins like Flash, which is a major security improvement.
-  - frame-ancestors 'none': Prevents the site from being embedded in an iframe (clickjacking protection).
-  - upgrade-insecure-requests: Automatically converts any HTTP requests to HTTPS.
-  - block-all-mixed-content: Prevents loading any HTTP assets on an HTTPS page.
-*/
-Content-Security-Policy: default-src 'self'; connect-src 'self' api.simplesvg.com api.unisvg.com api.iconify.design medlead.ir hub.medlead.ir api.medlead.ir model.medlead.ir security.medlead.ir; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests; block-all-mixed-content
+  X-Frame-Options: SAMEORIGIN
+  X-XSS-Protection: 1; mode=block
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
 
-# Other recommended security headers
-X-Frame-Options: DENY
-X-Content-Type-Options: nosniff
-Referrer-Policy: no-referrer
-Permissions-Policy: geolocation=(), microphone=(), camera=()
+# The existing CSP is too restrictive. The new one below allows LottieFiles animations.
+# Content-Security-Policy: default-src 'self'; script-src 'self'; connect-src 'self' api.simplesvg.com api.unisvg.com api.iconify.design medlead.ir hub.medlead.ir api.medlead.ir model.medlead.ir security.medlead.ir; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';
+
+# --- NEW AND CORRECTED CSP ---
+Content-Security-Policy: 
+  default-src 'self'; 
+  script-src 'self' 'unsafe-eval'; 
+  connect-src 'self' api.simplesvg.com api.unisvg.com api.iconify.design medlead.ir hub.medlead.ir api.medlead.ir model.medlead.ir security.medlead.ir https://cdn.jsdelivr.net https://unpkg.com; 
+  style-src 'self' 'unsafe-inline'; 
+  img-src 'self' data:; 
+  font-src 'self';

@@ -31,6 +31,7 @@ func (app *App) routes() http.Handler {
 		Log:         app.Log,
 		JWTSecret:   app.Config.JWTSecret,
 		EmailClient: app.EmailClient,
+		Uploader:    app.Uploader,
 	}
 
 	adminHandlers := &admin.Handlers{

@@ -31,6 +31,7 @@ type Handlers struct {
 	Log         *log.Logger
 	JWTSecret   string
 	EmailClient *email.EmailClient
+	Uploader    *storage.R2Uploader
 }
 
 // RegisterRequest defines the extended JSON body for registration.
@@ -325,14 +326,8 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedRefreshToken, err := bcrypt.GenerateFromPassword([]byte(refreshToken), bcrypt.DefaultCost)
-	if err != nil {
-		h.Log.Println("Error hashing refresh token:", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
 	updateQuery := `UPDATE public.profiles SET refresh_token = $1 WHERE id = $2`
-	_, err = h.Pool.Exec(context.Background(), updateQuery, string(hashedRefreshToken), user.ID)
+	_, err = h.Pool.Exec(context.Background(), updateQuery, refreshToken, user.ID)
 	if err != nil {
 		h.Log.Println("Error storing refresh token:", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -366,16 +361,16 @@ func (h *Handlers) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var storedTokenHash sql.NullString
+	var storedRefreshToken sql.NullString // Renamed for clarity
 	query := `SELECT refresh_token FROM public.profiles WHERE id = $1`
-	err = h.Pool.QueryRow(context.Background(), query, userID).Scan(&storedTokenHash)
-	if err != nil || !storedTokenHash.Valid {
+	err = h.Pool.QueryRow(context.Background(), query, userID).Scan(&storedRefreshToken)
+	if err != nil || !storedRefreshToken.Valid {
 		http.Error(w, "Refresh token not found or invalid", http.StatusUnauthorized)
 		return
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(storedTokenHash.String), []byte(body.RefreshToken))
-	if err != nil {
+	// Direct string comparison instead of bcrypt
+	if storedRefreshToken.String != body.RefreshToken {
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
 		return
 	}
